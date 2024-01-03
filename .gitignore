@@ -1,0 +1,14 @@
+# Ignore virtual environment files
+venv/
+
+# Ignore compiled Python files
+__pycache__/
+*.pyc
+
+# Ignore build artifacts
+build/
+dist/
+
+# Ignore other generated or temporary files
+*.swp
+*.log
