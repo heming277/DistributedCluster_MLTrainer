@@ -12,3 +12,13 @@ dist/
 # Ignore other generated or temporary files
 *.swp
 *.log
+
+
+# Ignore Rust build directory
+rust_ml_component/target/
+
+# Ignore Python cache directories in any subdirectory
+**/__pycache__/
+
+# Ignore pytest cache directories
+**/.pytest_cache/
