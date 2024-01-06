@@ -22,3 +22,7 @@ rust_ml_component/target/
 
 # Ignore pytest cache directories
 **/.pytest_cache/
+
+
+# Ignore DS_Store
+.DS_Store
