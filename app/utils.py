@@ -1,4 +1,4 @@
-# utils.py
+# app/utils.py
 from celery.result import AsyncResult
 from app.celery_worker import celery
 

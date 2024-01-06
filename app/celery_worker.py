@@ -1,19 +1,27 @@
-# celery_worker.py
+# app/celery_worker.py
 from celery import Celery
+from dotenv import load_dotenv
+import os
 
-celery = None
+
+# Load environment variables from .env file
+load_dotenv()
+
+celery = Celery(__name__)
 
 def init_celery(app):
-    global celery
-    celery = Celery(app.import_name, broker=app.config['CELERY_BROKER_URL'], backend=app.config['CELERY_RESULT_BACKEND'])
+    # Configure Celery using environment variables
+    celery.conf.broker_url = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')
+    celery.conf.result_backend = os.getenv('CELERY_RESULT_BACKEND', 'redis://localhost:6379/0')
     celery.conf.update(app.config)
-    TaskBase = celery.Task
 
-    class ContextTask(TaskBase):
+    print('Celery broker URL:', celery.conf.broker_url)
+    print('Celery result backend:', celery.conf.result_backend)
+
+    class ContextTask(celery.Task):
         abstract = True
-
         def __call__(self, *args, **kwargs):
             with app.app_context():
-                return TaskBase.__call__(self, *args, **kwargs)
+                return super(ContextTask, self).__call__(*args, **kwargs)
 
     celery.Task = ContextTask

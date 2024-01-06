@@ -1,4 +1,4 @@
-# ml.py
+# app/ml.py
 
 # Import necessary libraries for each ML framework
 import torch
@@ -11,6 +11,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 from app.celery_worker import celery
+from sklearn.preprocessing import LabelEncoder
 import numpy as np
 
 # Define a function to train a model using PyTorch
@@ -18,7 +19,14 @@ import numpy as np
 def train_pytorch_model(data, model_params):
     # Example model: simple feedforward neural network
 
-    X_train, y_train = data
+    # Convert the 'Species' column to integers
+    label_encoder = LabelEncoder()
+    y_encoded = label_encoder.fit_transform(data['y'])  # This will convert 'Iris-setosa', etc. to 0, 1, 2, ...
+    
+    # Convert the features and labels to tensors
+    X_train = torch.tensor(np.array(data['X'], dtype=np.float32))
+    y_train = torch.tensor(y_encoded, dtype=torch.long)  # Use torch.long for label tensors
+
     input_size = model_params['input_size']
     hidden_size = model_params['hidden_size']
     output_size = model_params['output_size']
@@ -45,14 +53,20 @@ def train_pytorch_model(data, model_params):
     model = model.to(device)
 
     # Convert data to PyTorch tensors
-    X_train = torch.tensor(X_train, dtype=torch.float32)
-    y_train = torch.tensor(y_train, dtype=torch.long)
+    X_train = torch.tensor(X_train, dtype=torch.float32) if not isinstance(X_train, torch.Tensor) else X_train.clone().detach()
+    y_train = torch.tensor(y_train, dtype=torch.long) if not isinstance(y_train, torch.Tensor) else y_train.clone().detach()
     train_dataset = TensorDataset(X_train, y_train)
     train_loader = DataLoader(train_dataset, batch_size, shuffle=True)
-   
-    X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.2)
-    val_dataset = TensorDataset(torch.tensor(X_val, dtype=torch.float32), torch.tensor(y_val, dtype=torch.long))
+
+    # Splitting the data
+    X_train, X_val, y_train, y_val = train_test_split(X_train.numpy(), y_train.numpy(), test_size=0.2)
+
+    # Convert validation data to PyTorch tensors
+    X_val = torch.tensor(X_val, dtype=torch.float32) if not isinstance(X_val, torch.Tensor) else X_val.clone().detach()
+    y_val = torch.tensor(y_val, dtype=torch.long) if not isinstance(y_val, torch.Tensor) else y_val.clone().detach()
+    val_dataset = TensorDataset(X_val, y_val)
     val_loader = DataLoader(val_dataset, batch_size, shuffle=False)
+
 
 
     # Loss function and optimizer
@@ -100,15 +114,21 @@ def train_pytorch_model(data, model_params):
 @celery.task
 def train_tensorflow_model(data, model_params):
     # Unpack the data
-    X_train, y_train = data['X_train'], data['y_train']
-    X_val, y_val = data['X_val'], data['y_val'] #validation data
+    X, y = map(np.array, (data['X'], data['y']))
+    
+    # Encode the string labels to integers
+    label_encoder = LabelEncoder()
+    y = label_encoder.fit_transform(y)
     
     # Unpack model parameters
     input_shape = model_params['input_shape']
-    num_classes = model_params['num_classes']
+    num_classes = len(np.unique(y))  # Update num_classes based on the unique labels
     learning_rate = model_params['learning_rate']
     batch_size = model_params['batch_size']
     epochs = model_params['epochs']
+    
+    # Split the data into training and validation sets
+    X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42)
     
     # Define the TensorFlow model
     model = tf.keras.models.Sequential([
@@ -125,12 +145,6 @@ def train_tensorflow_model(data, model_params):
         metrics=['accuracy']
     )
     
-    # Convert the data to numpy arrays if they aren't already
-    X_train = np.array(X_train)
-    y_train = np.array(y_train)
-    X_val = np.array(X_val)
-    y_val = np.array(y_val)
-    
     # Train the model
     history = model.fit(
         X_train, y_train,
@@ -142,9 +156,13 @@ def train_tensorflow_model(data, model_params):
     # Evaluate the model
     val_loss, val_accuracy = model.evaluate(X_val, y_val, verbose=0)
     train_accuracy = history.history['accuracy'][-1]  # Get the last training accuracy
-
     
-    model.save('model.h5')
+    # Save the model
+    model.save('model.keras')
+    
+    # Optionally, save the label encoder for later use
+    # import joblib
+    # joblib.dump(label_encoder, 'label_encoder.pkl')
     
     # Return the validation loss and accuracy
     return {
@@ -159,7 +177,7 @@ def train_tensorflow_model(data, model_params):
 @celery.task
 def train_sklearn_model(data, model_params):
     # Unpack the data provided by the user
-    X, y = data['X'], data['y']
+    X, y = np.array(data['X']), np.array(data['y'])
     
     # Unpack model parameters
     # Here we use .get() to provide default values if a parameter is not supplied
@@ -201,6 +219,7 @@ def train_sklearn_model(data, model_params):
     }
 
 # A function to determine which framework to use based on user input
+@celery.task
 def train_model(framework, data, model_params):
     if framework == 'pytorch':
         return train_pytorch_model(data, model_params)
