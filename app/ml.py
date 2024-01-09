@@ -21,7 +21,7 @@ def train_pytorch_model(data, model_params):
 
     # Convert the 'Species' column to integers
     label_encoder = LabelEncoder()
-    y_encoded = label_encoder.fit_transform(data['y'])  # This will convert 'Iris-setosa', etc. to 0, 1, 2, ...
+    y_encoded = label_encoder.fit_transform(data['y'])  
     
     # Convert the features and labels to tensors
     X_train = torch.tensor(np.array(data['X'], dtype=np.float32))
@@ -121,7 +121,9 @@ def train_tensorflow_model(data, model_params):
     y = label_encoder.fit_transform(y)
     
     # Unpack model parameters
-    input_shape = model_params['input_shape']
+    input_shape = model_params.get('input_shape')
+    if isinstance(input_shape, int):
+        input_shape = (input_shape,)
     num_classes = len(np.unique(y))  # Update num_classes based on the unique labels
     learning_rate = model_params['learning_rate']
     batch_size = model_params['batch_size']
@@ -217,6 +219,8 @@ def train_sklearn_model(data, model_params):
         "train_accuracy": train_accuracy,
         "accuracy": accuracy
     }
+
+
 
 # A function to determine which framework to use based on user input
 @celery.task

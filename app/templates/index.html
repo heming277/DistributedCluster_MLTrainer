@@ -1,0 +1,65 @@
+<!----templates/index.html-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Machine Learning Model Trainer</title>
+    <!-- Include Bootstrap CSS for styling -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <div class="container mt-5">
+        <h1 class="text-center">Upload CSV and Train Model</h1>
+        <form id="upload-form" enctype="multipart/form-data" class="mt-4">
+            <div class="form-group">
+                <label for="file">CSV File:</label>
+                <input type="file" class="form-control-file" id="file" name="file" accept=".csv" required>
+            </div>
+            <div class="form-check" style="display: none;" id="auto_input_size_container">
+                <input class="form-check-input" type="checkbox" name="auto_input_size" id="auto_input_size" checked>
+                <label class="form-check-label" for="auto_input_size">
+                    Auto-detect Input Size
+                </label>
+            </div>
+            
+            <div class="form-check" style="display: none;" id="auto_output_size_container">
+                <input class="form-check-input" type="checkbox" name="auto_output_size" id="auto_output_size" checked>
+                <label class="form-check-label" for="auto_output_size">
+                    Auto-detect Output Size
+                </label>
+            </div>
+            
+            <div class="form-check" style="display: none;" id="auto_input_shape_container">
+                <input class="form-check-input" type="checkbox" name="auto_input_shape" id="auto_input_shape" checked>
+                <label class="form-check-label" for="auto_input_shape">
+                    Auto-detect Input Shape
+                </label>
+            </div>
+            <div class="form-group">
+                <label for="model_type">Model Type:</label>
+                <select class="form-control" name="model_type" id="model_type" required>
+                    <option value="">Select a model type</option>
+                    <option value="pytorch">PyTorch</option>
+                    <option value="tensorflow">TensorFlow</option>
+                    <option value="sklearn">scikit-learn</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="target_column">Target Column:</label>
+                <input type="text" class="form-control" name="target_column" placeholder="Enter target column name" required>
+            </div>
+            <div id="model_params_container" class="form-group">
+                <!-- Model parameters will be inserted here based on the dropdown selection -->
+            </div>
+            <button type="submit" class="btn btn-primary">Upload and Train</button>
+        </form>
+        <div id="status-container" style="display:none;" class="mt-4">
+            <h2>Job Status: <span id="job-status">Waiting...</span></h2>
+            <pre id="job-result"></pre>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='scripts.js') }}"></script>
+</body>
+</html>
