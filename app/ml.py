@@ -17,23 +17,30 @@ import numpy as np
 # Define a function to train a model using PyTorch
 @celery.task
 def train_pytorch_model(data, model_params):
-    # Example model: simple feedforward neural network
-
     # Convert the 'Species' column to integers
     label_encoder = LabelEncoder()
-    y_encoded = label_encoder.fit_transform(data['y'])  
-    
-    # Convert the features and labels to tensors
-    X_train = torch.tensor(np.array(data['X'], dtype=np.float32))
-    y_train = torch.tensor(y_encoded, dtype=torch.long)  # Use torch.long for label tensors
+    y_encoded = label_encoder.fit_transform(data['y'])
 
-    input_size = model_params['input_size']
-    hidden_size = model_params['hidden_size']
-    output_size = model_params['output_size']
-    learning_rate = model_params['learning_rate']
-    batch_size = model_params['batch_size']
-    epochs = model_params['epochs']
-    
+    # Split the data into training and validation sets before converting to tensors
+    X_train, X_val, y_train, y_val = train_test_split(
+        np.array(data['X'], dtype=np.float32),
+        y_encoded,
+        test_size=0.2,
+        random_state=42  
+    )
+
+    # Convert the training and validation data to PyTorch tensors
+    X_train_tensor = torch.tensor(X_train, dtype=torch.float32)
+    y_train_tensor = torch.tensor(y_train, dtype=torch.long)
+    X_val_tensor = torch.tensor(X_val, dtype=torch.float32)
+    y_val_tensor = torch.tensor(y_val, dtype=torch.long)
+
+    # Create TensorDatasets and DataLoaders for training and validation
+    train_dataset = TensorDataset(X_train_tensor, y_train_tensor)
+    val_dataset = TensorDataset(X_val_tensor, y_val_tensor)
+    train_loader = DataLoader(train_dataset, batch_size=model_params['batch_size'], shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=model_params['batch_size'], shuffle=False)
+
     # Define the model using the parameters
     class SimpleNet(nn.Module):
         def __init__(self, input_size, hidden_size, output_size):
@@ -46,35 +53,22 @@ def train_pytorch_model(data, model_params):
             x = torch.relu(self.fc1(x))
             x = self.fc2(x)
             return x
-    
-    
-    model = SimpleNet(input_size, hidden_size, output_size)
+
+    model = SimpleNet(
+        input_size=model_params['input_size'],
+        hidden_size=model_params['hidden_size'],
+        output_size=model_params['output_size']
+    )
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = model.to(device)
-
-    # Convert data to PyTorch tensors
-    X_train = torch.tensor(X_train, dtype=torch.float32) if not isinstance(X_train, torch.Tensor) else X_train.clone().detach()
-    y_train = torch.tensor(y_train, dtype=torch.long) if not isinstance(y_train, torch.Tensor) else y_train.clone().detach()
-    train_dataset = TensorDataset(X_train, y_train)
-    train_loader = DataLoader(train_dataset, batch_size, shuffle=True)
-
-    # Splitting the data
-    X_train, X_val, y_train, y_val = train_test_split(X_train.numpy(), y_train.numpy(), test_size=0.2)
-
-    # Convert validation data to PyTorch tensors
-    X_val = torch.tensor(X_val, dtype=torch.float32) if not isinstance(X_val, torch.Tensor) else X_val.clone().detach()
-    y_val = torch.tensor(y_val, dtype=torch.long) if not isinstance(y_val, torch.Tensor) else y_val.clone().detach()
-    val_dataset = TensorDataset(X_val, y_val)
-    val_loader = DataLoader(val_dataset, batch_size, shuffle=False)
-
-
+    model.to(device)
 
     # Loss function and optimizer
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(model.parameters(), learning_rate)
+    optimizer = optim.SGD(model.parameters(), lr=model_params['learning_rate'])
 
     # Training loop
-    for _ in range(epochs):  # Example: 10 epochs
+    for epoch in range(model_params['epochs']):
+        model.train()  # Set the model to training mode
         for inputs, targets in train_loader:
             inputs, targets = inputs.to(device), targets.to(device)
             optimizer.zero_grad()
@@ -83,8 +77,7 @@ def train_pytorch_model(data, model_params):
             loss.backward()
             optimizer.step()
 
-   
-
+    # Calculate accuracy function
     def calculate_accuracy(model, data_loader):
         model.eval()  # Set the model to evaluation mode
         correct = 0
@@ -98,17 +91,21 @@ def train_pytorch_model(data, model_params):
                 correct += (predicted == targets).sum().item()
         return correct / total
 
+    # Calculate validation and training accuracy
     val_accuracy = calculate_accuracy(model, val_loader)
-    # Calculate training accuracy
     train_accuracy = calculate_accuracy(model, train_loader)
 
+    # Save the model
     torch.save(model.state_dict(), 'model.pth')
-    # Return a success message or any relevant results
+
+    # Return results
     return {
         "message": "PyTorch model trained successfully",
         "train_accuracy": train_accuracy,
-        "val_accuracy": val_accuracy 
+        "val_accuracy": val_accuracy
     }
+
+
 
 # Define a function to train a model using TensorFlow
 @celery.task
@@ -162,10 +159,6 @@ def train_tensorflow_model(data, model_params):
     # Save the model
     model.save('model.keras')
     
-    # Optionally, save the label encoder for later use
-    # import joblib
-    # joblib.dump(label_encoder, 'label_encoder.pkl')
-    
     # Return the validation loss and accuracy
     return {
         "message": "TensorFlow model trained successfully",
@@ -182,7 +175,7 @@ def train_sklearn_model(data, model_params):
     X, y = np.array(data['X']), np.array(data['y'])
     
     # Unpack model parameters
-    # Here we use .get() to provide default values if a parameter is not supplied
+    #  .get() to provide default values if a parameter is not supplied
     test_size = model_params.get('test_size', 0.2)
     random_state = model_params.get('random_state', None)
     max_iter = model_params.get('max_iter', 100)
