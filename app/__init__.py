@@ -2,14 +2,18 @@
 from flask import Flask
 import os
 from dotenv import load_dotenv
-from app.ml import train_pytorch_model, train_tensorflow_model, train_sklearn_model
+from authlib.integrations.flask_client import OAuth
+from flask_cors import CORS
 
-# Load environment variables from .env file
+oauth = OAuth()
 load_dotenv()
+
 
 def create_app():
     app = Flask(__name__)
+    CORS(app)
     # Configure Celery using environment variables
+    app.secret_key = os.getenv("APP_SECRET_KEY")
     app.config['CELERY_BROKER_URL'] = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')
     app.config['CELERY_RESULT_BACKEND'] = os.getenv('CELERY_RESULT_BACKEND', 'redis://localhost:6379/0')
 
@@ -24,8 +28,20 @@ def create_app():
     from app.celery_worker import init_celery
     init_celery(app)
 
+    # Configure the OAuth object with Auth0
+    oauth.init_app(app)
     
+    oauth.register(
+        "auth0",
+        client_id=os.getenv("AUTH0_CLIENT_ID"),
+        client_secret=os.getenv("AUTH0_CLIENT_SECRET"),
+        client_kwargs={
+            "scope": "openid profile email",
+        },
+        server_metadata_url=f'https://{os.getenv("AUTH0_DOMAIN")}/.well-known/openid-configuration'
+    )
 
+    # Register the main blueprint
     from app.views import main as main_blueprint
     app.register_blueprint(main_blueprint)
 

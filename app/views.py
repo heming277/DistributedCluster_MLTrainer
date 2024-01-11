@@ -2,6 +2,10 @@
 from flask import Blueprint, request, jsonify, current_app
 from flask import render_template
 from flask import send_from_directory
+from flask import redirect, url_for, session
+from functools import wraps
+from app import oauth
+from urllib.parse import quote_plus, urlencode
 from werkzeug.utils import secure_filename
 import os
 import pandas as pd
@@ -15,9 +19,47 @@ import re
 main = Blueprint('main', __name__)
 
 @main.route('/')
-def hello_world():
-    #frontend_dir = os.path.abspath(os.path.join(current_app.root_path, '..', 'frontend'))
-    return render_template('index.html') 
+def home():
+    print(session) 
+    return render_template('index.html', session=session.get('user'), pretty=json.dumps(session.get('user'), indent=4))
+
+
+@main.route("/callback", methods=["GET", "POST"])
+def callback():
+    token = oauth.auth0.authorize_access_token()
+    session["user"] = token
+    return redirect("/")
+
+
+
+@main.route("/login")
+def login():
+    return oauth.auth0.authorize_redirect(
+        redirect_uri=url_for("main.callback", _external=True)
+    )
+
+@main.route('/signup')
+def signup():
+    # Redirect to Auth0 for signup
+    redirect_uri = url_for('main.callback', _external=True)
+    return oauth.auth0.authorize_redirect(redirect_uri=redirect_uri, screen_hint='signup')
+
+
+@main.route("/logout")
+def logout():
+    session.clear()
+    return redirect(
+        "https://" + os.getenv("AUTH0_DOMAIN")
+        + "/v2/logout?"
+        + urlencode(
+            {
+                "returnTo": url_for("main.home", _external=True),
+                "client_id": os.getenv("AUTH0_CLIENT_ID"),
+            },
+            quote_via=quote_plus,
+        )
+    )
+
 
 def is_identifier_column(col_name):
     # Normalize the column name by removing whitespace and special characters
@@ -161,3 +203,14 @@ def job_result(job_id):
 def allowed_file(filename):
     ALLOWED_EXTENSIONS = {'csv', 'txt', 'pdf', 'png', 'jpg', 'jpeg', 'docx'}
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def requires_auth(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if 'profile' not in session:
+            # Redirect to Login page here
+            return redirect('/')
+        return f(*args, **kwargs)
+
+    return decorated
