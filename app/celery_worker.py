@@ -3,7 +3,6 @@ from celery import Celery
 from dotenv import load_dotenv
 import os
 
-
 # Load environment variables from .env file
 load_dotenv()
 
@@ -25,3 +24,9 @@ def init_celery(app):
                 return super(ContextTask, self).__call__(*args, **kwargs)
 
     celery.Task = ContextTask
+
+# Import tasks after Celery instance has been created and configured
+# Make sure the import path is correct based on your project structure
+from app.ml import train_pytorch_model
+from app.ml import train_tensorflow_model
+from app.ml import train_sklearn_model

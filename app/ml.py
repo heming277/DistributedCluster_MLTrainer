@@ -1,6 +1,7 @@
 # app/ml.py
 
 # Import necessary libraries for each ML framework
+from flask import current_app
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -13,6 +14,17 @@ from sklearn.metrics import accuracy_score
 from app.celery_worker import celery
 from sklearn.preprocessing import LabelEncoder
 import numpy as np
+from joblib import dump
+import os
+
+
+
+# Define the models directory
+models_directory = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models')
+
+if not os.path.exists(models_directory):
+    os.makedirs(models_directory)
+
 
 # Define a function to train a model using PyTorch
 @celery.task
@@ -96,13 +108,15 @@ def train_pytorch_model(data, model_params):
     train_accuracy = calculate_accuracy(model, train_loader)
 
     # Save the model
-    torch.save(model.state_dict(), 'model.pth')
+    model_save_path = os.path.join(models_directory, 'model.pth')
+    torch.save(model.state_dict(), model_save_path)
 
     # Return results
     return {
         "message": "PyTorch model trained successfully",
         "train_accuracy": train_accuracy,
-        "val_accuracy": val_accuracy
+        "val_accuracy": val_accuracy,
+        "model_filename": 'model.pth'  
     }
 
 
@@ -157,7 +171,8 @@ def train_tensorflow_model(data, model_params):
     train_accuracy = history.history['accuracy'][-1]  # Get the last training accuracy
     
     # Save the model
-    model.save('model.keras')
+    model_save_path = os.path.join(models_directory, 'model.keras')
+    model.save(model_save_path)
     
     # Return the validation loss and accuracy
     return {
@@ -165,7 +180,8 @@ def train_tensorflow_model(data, model_params):
         "validation_loss": val_loss,
         "validation_accuracy": val_accuracy,
         "train_accuracy": train_accuracy,
-        "history": history.history
+        "history": history.history,
+        "model_filename": 'model.keras'  # Add the filename to the response
     }
 
 # Define a function to train a model using scikit-learn
@@ -202,18 +218,18 @@ def train_sklearn_model(data, model_params):
     #Calculate the accuracy on the training data
     train_accuracy = accuracy_score(y_train, y_train_pred)
  
-
-    from joblib import dump
-    dump(model, 'logistic_regression_model.joblib')
+    print(f"Current working directory: {os.getcwd()}")
+    model_save_path = os.path.join(models_directory, 'logistic_regression_model.joblib')
+    print(f"Model save path: {model_save_path}")
+    dump(model, model_save_path)
     
     # Return the accuracy and a success message
     return {
         "message": "scikit-learn model trained successfully",
         "train_accuracy": train_accuracy,
-        "accuracy": accuracy
+        "accuracy": accuracy,
+        "model_filename": 'logistic_regression_model.joblib'  
     }
-
-
 
 # A function to determine which framework to use based on user input
 @celery.task

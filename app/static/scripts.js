@@ -155,14 +155,22 @@ function createParamInput(name, label, placeholder) {
 
 
 function checkJobStatus(jobId) {
-    fetch(`/job_status/${jobId}`)
+    fetch(`/job_result/${jobId}`)
     .then(response => response.json())
     .then(data => {
         document.getElementById('job-status').textContent = data.status;
-        if (data.status === 'SUCCESS' || data.status === 'FAILURE') {
+        if (data.status === 'SUCCESS') {
+            // Job is successful, display results and download link
             if (data.result) {
                 document.getElementById('job-result').textContent = JSON.stringify(data.result, null, 2);
             }
+            // Show the download link
+            const downloadLink = document.getElementById('download-link');
+            downloadLink.href = `/download/${encodeURIComponent(data.result.model_filename)}`;
+            document.getElementById('download-container').style.display = 'block';
+        } else if (data.status === 'FAILURE') {
+            // Job failed, display error message
+            document.getElementById('job-result').textContent = 'Job failed. Please try again.';
         } else {
             // If the job is still running, check again after a delay
             setTimeout(() => checkJobStatus(jobId), 2000);
@@ -173,4 +181,5 @@ function checkJobStatus(jobId) {
         alert('An error occurred while checking the job status.');
     });
 }
+
 

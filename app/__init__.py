@@ -20,9 +20,13 @@ def create_app():
     # Set the upload folder for file uploads
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     app.config['UPLOAD_FOLDER'] = os.path.join(BASE_DIR, 'uploads')
-
     # Ensure the upload path exists
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+    
+    # Configure the models directory
+    app.config['MODELS_DIRECTORY'] = os.path.join(BASE_DIR, 'models')
+    # Ensure the models directory exists
+    os.makedirs(app.config['MODELS_DIRECTORY'], exist_ok=True)
     
     # Initialize Celery
     from app.celery_worker import init_celery
