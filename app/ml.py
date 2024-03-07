@@ -58,6 +58,7 @@ def train_pytorch_model(data, model_params):
         def __init__(self, input_size, hidden_size, output_size):
             super(SimpleNet, self).__init__()
             self.fc1 = nn.Linear(input_size, hidden_size)
+            self.relu = nn.ReLU()
             self.fc2 = nn.Linear(hidden_size, output_size)
 
         def forward(self, x):
@@ -76,7 +77,7 @@ def train_pytorch_model(data, model_params):
 
     # Loss function and optimizer
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(model.parameters(), lr=model_params['learning_rate'])
+    optimizer = optim.Adam(model.parameters(), lr=model_params['learning_rate'])
 
     # Training loop
     for epoch in range(model_params['epochs']):

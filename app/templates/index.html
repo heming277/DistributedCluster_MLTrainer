@@ -6,6 +6,7 @@
     <title>Machine Learning Model Trainer</title>
     <!-- Include Bootstrap CSS for styling -->
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     <style>
         body {
@@ -35,8 +36,8 @@
         {% else %}
             <h1>Welcome Guest</h1>
             <div class="auth-buttons">
-                <a href="/login" class="btn btn-primary">Login</a>
-                <a href="/signup" class="btn btn-info">Sign Up</a>
+                <a href="/signup" class="btn btn-success">Sign Up</a>
+                <a href="/login" class="btn btn-success">Login</a>
             </div>
         {% endif %}
     </div>
@@ -47,6 +48,7 @@
                 <label for="file">CSV File:</label>
                 <input type="file" class="form-control-file" id="file" name="file" accept=".csv" required>
             </div>
+            <input type="hidden" id="file_reference" name="file_reference">
             <div class="form-check" style="display: none;" id="auto_input_size_container">
                 <input class="form-check-input" type="checkbox" name="auto_input_size" id="auto_input_size" checked>
                 <label class="form-check-label" for="auto_input_size">
@@ -86,11 +88,28 @@
             <button type="submit" class="btn btn-primary">Upload and Train</button>
         </form>
         <div id="status-container" style="display:none;" class="mt-4">
-            <h2>Job Status: <span id="job-status">Waiting...</span></h2>
+            
             <pre id="job-result"></pre>
         </div>
         <div id="download-container" style="display:none;" class="mt-4 text-center">
             <a href="#" id="download-link" class="btn btn-success">Download Model</a>
+        </div>
+    </div>
+
+    <div id="loadingSpinner" class="spinner-container" style="display:none;">
+        <i class="fas fa-spinner fa-spin"></i> Processing...
+    </div>
+    <div id="statusModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <div class="modal-title">
+                <h2>Job Status</h2>
+            </div>
+            <h3><span id="modal-job-status">Waiting...</span></h3>
+            <pre id="modal-job-result"></pre>
+            <div id="modal-download-container" class="text-center" style="display:none;">
+                <a href="#" id="modal-download-link" class="btn btn-success">Download Model</a>
+            </div>
         </div>
     </div>
     <script src="{{ url_for('static', filename='scripts.js') }}"></script>

@@ -26,7 +26,6 @@ def init_celery(app):
     celery.Task = ContextTask
 
 # Import tasks after Celery instance has been created and configured
-# Make sure the import path is correct based on your project structure
 from app.ml import train_pytorch_model
 from app.ml import train_tensorflow_model
 from app.ml import train_sklearn_model
