@@ -42,10 +42,10 @@
         {% endif %}
     </div>
     <div class="container">
-        <h1 class="text-center">Upload CSV and Train Model</h1>
+        <h1 class="text-center">Upload Data and Train Model</h1>
         <form id="upload-form" enctype="multipart/form-data" class="mt-4">
             <div class="form-group">
-                <label for="file">CSV File:</label>
+                <label for="file">Data or File:</label>
                 <input type="file" class="form-control-file" id="file" name="file" accept=".csv" required>
             </div>
             <input type="hidden" id="file_reference" name="file_reference">
@@ -79,7 +79,7 @@
                 </select>
             </div>
             <div class="form-group">
-                <label for="target_column">Target Column:</label>
+                <label for="target_column">Target Column: (The column you want to predict, e.g., 'Species' in Iris Dataset)</label>
                 <input type="text" class="form-control" name="target_column" placeholder="Enter target column name" required>
             </div>
             <div id="model_params_container" class="form-group">

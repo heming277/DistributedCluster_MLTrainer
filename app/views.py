@@ -14,6 +14,8 @@ from .utils import get_job_status, get_job_result
 from app.ml import train_pytorch_model, train_tensorflow_model, train_sklearn_model
 from app.celery_worker import celery
 from celery.result import AsyncResult
+from sklearn.impute import SimpleImputer
+import numpy as np
 import re
 import hashlib
 
@@ -113,6 +115,7 @@ def train_model():
     if filename.rsplit('.', 1)[1].lower() == 'csv':
         data = pd.read_csv(filepath, sep=None, engine='python') # Make sure to use the correct separator
         print("Columns in the CSV file:", data.columns.tolist())
+        data = data.dropna(axis=1, how='all')
         if not target_column or target_column not in data.columns:
             return jsonify({
                 "error": f"Target column '{target_column}' not specified or not found in {data.columns.tolist()}",

@@ -217,7 +217,7 @@ function displayModelResults(data) {
 
     // Check and append accuracy if available (for scikit-learn model)
     if (data.accuracy !== undefined) {
-        resultText += `Accuracy: ${data.accuracy.toFixed(4)}\n`;
+        resultText += `Validation Accuracy: ${data.accuracy.toFixed(4)}\n`;
     }
 
     // Check and append validation loss if available
