@@ -29,6 +29,11 @@ from torch.utils.data import WeightedRandomSampler
 import numpy as np
 from joblib import dump
 import os
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+import seaborn as sns
+
 
 
 
@@ -38,11 +43,46 @@ models_directory = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'mod
 if not os.path.exists(models_directory):
     os.makedirs(models_directory)
 
+def plot_training_history(history, plot_path='static/training_history.png'):
+    plt.figure(figsize=(12, 6))
+    
+    # Plot training & validation accuracy values
+    plt.subplot(1, 2, 1)
+    sns.lineplot(data=history, x=range(len(history['train_accuracy'])), y='train_accuracy', label='Train', marker='o')
+    sns.lineplot(data=history, x=range(len(history['val_accuracy'])), y='val_accuracy', label='Validation', marker='o')
+    plt.title('Model Accuracy')
+    plt.ylabel('Accuracy')
+    plt.xlabel('Epoch')
+    plt.legend()
+    
+    # Plot training & validation loss values
+    plt.subplot(1, 2, 2)
+    sns.lineplot(data=history, x=range(len(history['train_loss'])), y='train_loss', label='Train', marker='o')
+    sns.lineplot(data=history, x=range(len(history['val_loss'])), y='val_loss', label='Validation', marker='o')
+    plt.title('Model Loss')
+    plt.ylabel('Loss')
+    plt.xlabel('Epoch')
+    plt.legend()
+    
+    plt.tight_layout()
+    plt.savefig(plot_path)
+    plt.close()
+
+    
 
 # Define a function to train a model using PyTorch
 @celery.task
 def train_pytorch_model(data, model_params):
     # Convert the 'Species' column to integers
+
+    history = {
+    'train_loss': [],
+    'val_loss': [],
+    'train_accuracy': [],
+    'val_accuracy': []
+    }
+
+
     label_encoder = LabelEncoder()
     y_encoded = label_encoder.fit_transform(data['y'])
 
@@ -115,6 +155,9 @@ def train_pytorch_model(data, model_params):
     # Training loop
     for epoch in range(model_params['epochs']):
         model.train()  # Set the model to training mode
+        train_loss_accumulated = 0
+        total_train = 0
+        correct_train = 0
         for inputs, targets in train_loader:
             inputs, targets = inputs.to(device), targets.to(device)
             optimizer.zero_grad()
@@ -122,23 +165,42 @@ def train_pytorch_model(data, model_params):
             loss = criterion(outputs, targets)
             loss.backward()
             optimizer.step()
-        
+
+            train_loss_accumulated += loss.item()
+            _, predicted = torch.max(outputs.data, 1)
+            total_train += targets.size(0)
+            correct_train += (predicted == targets).sum().item()
+
+        avg_train_loss = train_loss_accumulated / len(train_loader)
+        train_accuracy = correct_train / total_train
+        history['train_loss'].append(avg_train_loss)
+        history['train_accuracy'].append(train_accuracy)
 
         # Validation phase
         model.eval()  # Set the model to evaluation mode
-        val_loss = 0
+        val_loss_accumulated = 0
+        total_val = 0
+        correct_val = 0
         with torch.no_grad():  # No need to track gradients for validation
             for inputs, targets in val_loader:
                 inputs, targets = inputs.to(device), targets.to(device)
                 outputs = model(inputs)
                 loss = criterion(outputs, targets)
-                val_loss += loss.item()
-        val_loss /= len(val_loader)
-        scheduler.step(val_loss)
+                val_loss_accumulated += loss.item()
+                _, predicted = torch.max(outputs.data, 1)
+                total_val += targets.size(0)
+                correct_val += (predicted == targets).sum().item()
+
+        avg_val_loss = val_loss_accumulated / len(val_loader)
+        val_accuracy = correct_val / total_val
+        history['val_loss'].append(avg_val_loss)
+        history['val_accuracy'].append(val_accuracy)
+
+        scheduler.step(avg_val_loss)
 
         # Early Stopping check
-        if val_loss < best_val_loss:
-            best_val_loss = val_loss
+        if avg_val_loss < best_val_loss:
+            best_val_loss = avg_val_loss
             patience_counter = 0  # Reset patience counter
             # Save the best model
             best_model_path = os.path.join(models_directory, 'best_model.pth')
@@ -149,20 +211,19 @@ def train_pytorch_model(data, model_params):
                 print(f"Early stopping triggered after {epoch + 1} epochs.")
                 break  # Exit the training loop
 
-        # Calculate validation and training accuracy
-        val_accuracy = calculate_accuracy(model, val_loader, device)
-        train_accuracy = calculate_accuracy(model, train_loader, device)
-        print(f"Epoch {epoch + 1}, Train Accuracy: {train_accuracy}, Validation Accuracy: {val_accuracy}, Validation Loss: {val_loss}")
+        print(f"Epoch {epoch + 1}, Train Loss: {avg_train_loss:.4f}, Train Accuracy: {train_accuracy:.4f}, Validation Loss: {avg_val_loss:.4f}, Validation Accuracy: {val_accuracy:.4f}")
 
     # Load the best model for further use or evaluation
     model.load_state_dict(torch.load(best_model_path))
 
-    # Return results
+    # Return results, including the history
     return {
+        'model_type': 'pytorch',
         "message": "PyTorch model trained successfully",
         "train_accuracy": train_accuracy,
         "val_accuracy": val_accuracy,
-        "model_filename": 'best_model.pth'  
+        "model_filename": 'best_model.pth',
+        "history": history  # Include the history in the return statement
     }
 
 def calculate_accuracy(model, data_loader, device):
@@ -251,6 +312,7 @@ def train_tensorflow_model(data, model_params):
     
     # Return the validation loss and accuracy
     return {
+        'model_type': 'tensorflow',
         "message": "TensorFlow model trained successfully",
         "validation_loss": val_loss,
         "validation_accuracy": val_accuracy,
@@ -314,6 +376,7 @@ def train_sklearn_model(data, model_params):
 
     # Return the accuracy and a success message
     return {
+        'model_type': 'sklearn',
         "message": f"{model_type} model trained successfully",
         "train_accuracy": accuracy_score(y_train, best_model.predict(X_train)),
         "accuracy": best_accuracy,

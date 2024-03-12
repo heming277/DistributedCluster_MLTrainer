@@ -11,13 +11,15 @@ import os
 import pandas as pd
 import json
 from .utils import get_job_status, get_job_result
-from app.ml import train_pytorch_model, train_tensorflow_model, train_sklearn_model
+from app.ml import train_pytorch_model, train_tensorflow_model, train_sklearn_model, plot_training_history
 from app.celery_worker import celery
 from celery.result import AsyncResult
 from sklearn.impute import SimpleImputer
 import numpy as np
 import re
 import hashlib
+
+
 
 main = Blueprint('main', __name__)
 
@@ -181,11 +183,25 @@ def train_model():
 
         # Send task to Celery based on model_type
         task = celery.send_task(f'app.ml.train_{model_type}_model', args=[job_data, model_params])
-        return jsonify({"message": "Job submitted successfully", "job_id": task.id, "file_reference": file_reference}), 202
+
+        response_data = {
+            "message": "Job submitted successfully",
+            "job_id": task.id,
+            "file_reference": file_reference  # Assuming file_reference is meaningful for later retrieval or reference
+        }
+        return jsonify(response_data), 202
+        #return jsonify({"message": "Job submitted successfully", "job_id": task.id, "file_reference": file_reference}), 202
     else:
         return jsonify({"error": "Unsupported file type"}), 400
 
-    
+
+
+
+
+
+@main.route('/uploads/<filename>')
+def uploaded_file(filename):
+    return send_from_directory(current_app.config['UPLOAD_FOLDER'], filename)
 
 @main.route('/job_status/<job_id>', methods=['GET'])
 def job_status(job_id):
@@ -206,11 +222,50 @@ def job_status(job_id):
 
 @main.route('/job_result/<job_id>', methods=['GET'])
 def job_result(job_id):
+    print(f"Job result requested for jobId: {job_id}") 
     task = AsyncResult(job_id, app=celery)
     if task.ready():
-        print(task.result) 
-        model_filename = task.result.get('model_filename')
-        if model_filename is None:
+        task_result = task.result
+        if 'model_filename' in task_result:
+            model_filename = task_result['model_filename']
+            model_save_path = os.path.join(current_app.config['MODELS_DIRECTORY'], model_filename)
+            
+            # Check if history data is available for plotting
+            if 'history' in task_result:
+                history = task_result['history']
+                plot_filename = f"training_history_{task_result['model_type']}.png"
+                plot_path = os.path.join(current_app.config['UPLOAD_FOLDER'], plot_filename)
+                
+                if task_result['model_type'] == 'tensorflow':
+                    # Ensure history is in the correct format for TensorFlow cases
+                    adjusted_history = {
+                        'train_accuracy': history['accuracy'],
+                        'val_accuracy': history['val_accuracy'],
+                        'train_loss': history['loss'],
+                        'val_loss': history['val_loss']
+                    }
+                    plot_training_history(adjusted_history, plot_path)
+                else:
+                    # For PyTorch or other model types, assume history is already in the correct format
+                    plot_training_history(history, plot_path)
+                
+                # Include plot filename in the response
+                response_data = {
+                    'job_id': job_id,
+                    'status': task.status,
+                    'result': task_result,
+                    'model_save_path': model_save_path,
+                    'plot_filename': plot_filename
+                }
+            else:
+                response_data = {
+                    'job_id': job_id,
+                    'status': task.status,
+                    'result': task_result,
+                    'model_save_path': model_save_path
+                }
+            return jsonify(response_data), 200
+        else:
             # Handle the case where model_filename is not set
             response = {
                 'job_id': job_id,
@@ -218,14 +273,6 @@ def job_result(job_id):
                 'status': task.status
             }
             return jsonify(response), 500
-        model_save_path = os.path.join(current_app.config['MODELS_DIRECTORY'], model_filename)
-        response = {
-            'job_id': job_id,
-            'status': task.status,
-            'result': task.result,
-            'model_save_path': model_save_path  # Add the model_save_path
-        }
-        return jsonify(response), 200
     else:
         response = {
             'job_id': job_id,
@@ -233,7 +280,12 @@ def job_result(job_id):
             'status': task.status
         }
         return jsonify(response), 404
-    
+
+
+
+
+
+
 
 @main.route('/download/<path:filename>', methods=['GET'])  
 def download(filename):

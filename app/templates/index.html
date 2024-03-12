@@ -45,7 +45,7 @@
         <h1 class="text-center">Upload Data and Train Model</h1>
         <form id="upload-form" enctype="multipart/form-data" class="mt-4">
             <div class="form-group">
-                <label for="file">Data or File:</label>
+                <label for="file">CSV File:</label>
                 <input type="file" class="form-control-file" id="file" name="file" accept=".csv" required>
             </div>
             <input type="hidden" id="file_reference" name="file_reference">
@@ -107,6 +107,7 @@
             </div>
             <h3><span id="modal-job-status">Waiting...</span></h3>
             <pre id="modal-job-result"></pre>
+            <img id="trainingPlot" src="" style="display: none;" alt="Training History Plot">
             <div id="modal-download-container" class="text-center" style="display:none;">
                 <a href="#" id="modal-download-link" class="btn btn-success">Download Model</a>
             </div>

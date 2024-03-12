@@ -54,7 +54,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 alert(data.error); // Inform the user about the error
             } else if (data.job_id) {
                 document.getElementById('status-container').style.display = 'block';
-                // Assuming checkJobStatus is a function you've defined elsewhere
                 checkJobStatus(data.job_id);
 
                 if (data.file_reference) {
@@ -190,6 +189,41 @@ function createParamInput(name, label, placeholder) {
     `;
 }
 
+function fetchTrainingResult(jobId) {
+    fetch(`/job_result/${jobId}`)
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Network response was not ok: ' + response.statusText);
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.status === 'SUCCESS' && data.result) {
+            displayModelResults(data.result);
+            // Update the plot image within the modal
+            const plotElement = document.getElementById('trainingPlot');
+            if (data.plot_filename) {
+                const timestamp = new Date().getTime();
+                const plotImgUrl = `/uploads/${encodeURIComponent(data.plot_filename)}?t=${timestamp}`;
+                plotElement.src = plotImgUrl;
+                plotElement.style.display = 'block'; // Ensure the image is visible
+            }
+            else {
+                plotElement.style.display = 'none'; // Hide the plot if no filename is provided
+                plotElement.src = ''; // Optionally reset the src attribute
+            }
+            showModal(); // This function shows the modal, which now includes the plot
+        } else {
+            document.getElementById('modal-job-result').textContent = 'Job completed, but no results found.';
+            showModal();
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while fetching the training result.');
+    });
+}
+
 
 function displayModelResults(data) {
     const modalJobStatus = document.getElementById('modal-job-status');
@@ -234,35 +268,58 @@ function displayModelResults(data) {
 }
 
 function checkJobStatus(jobId) {
+    console.log("Checking job status for jobId:", jobId);
+    const requestUrl = `/job_result/${jobId}`;
+    console.log("Request URL:", requestUrl);
     fetch(`/job_result/${jobId}`)
-    .then(response => response.json())
+    .then(response => {
+        if (response.status === 404) {
+            console.log('Job result not ready yet, retrying...');
+            // Schedule another check after a delay
+            setTimeout(() => checkJobStatus(jobId), 2000);
+            throw new Error('JobNotReady');// Return null to prevent further processing in this promise chain
+        }
+        if (!response.ok) {
+            // For any other non-OK responses, throw an error to be caught by the catch block
+            throw new Error('Network response was not ok: ' + response.statusText);
+        }
+        return response.json();
+    })
     .then(data => {
         document.getElementById('modal-job-status').textContent = data.status;
         if (data.status === 'SUCCESS') {
-            // Job is successful, display results and download link in the modal
-          /*if (data.result) {
-                document.getElementById('modal-job-result').textContent = JSON.stringify(data.result, null, 2);
-            }
-            const downloadLink = document.getElementById('modal-download-link');
-            downloadLink.href = `/download/${encodeURIComponent(data.result.model_filename)}`;
-            document.getElementById('modal-download-container').style.display = 'block';*/
+            // Directly handle the success logic here, avoiding an additional fetch
             displayModelResults(data.result);
+            const plotElement = document.getElementById('trainingPlot');
+            if (data.plot_filename) {
+                const timestamp = new Date().getTime();
+                const plotImgUrl = `/uploads/${encodeURIComponent(data.plot_filename)}?t=${timestamp}`;
+                plotElement.src = plotImgUrl;
+                plotElement.style.display = 'block';
+            } else {
+                plotElement.style.display = 'none';
+                plotElement.src = '';
+            }
             showModal();
         } else if (data.status === 'FAILURE') {
-            // Job failed, display error message in the modal
             document.getElementById('modal-job-result').textContent = 'Job failed. Please try again.';
             showModal();
         } else {
-            // If the job is still running, check again after a delay
-            setTimeout(() => checkJobStatus(jobId), 2000);
+            setTimeout(() => checkJobStatus(jobId), 2000); // Poll if the job is still running
         }
     })
     .catch(error => {
+        if (error.message === 'JobNotReady') {
+            // This is our custom error for a not-ready job, so we don't need to log or alert
+            return;
+        }
         console.error('Error:', error);
         document.getElementById('loadingSpinner').style.display = 'none';
         alert('An error occurred while checking the job status.');
     });
 }
+
+
 
 // Function to show the modal
 function showModal() {
