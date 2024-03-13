@@ -1,0 +1,20 @@
+version: '3'
+services:
+  web:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=development
+    env_file:
+      - .env  
+  redis:
+    image: "redis:alpine"
+  celery_worker:
+    build: .
+    command: celery -A app.celery_worker.celery worker --loglevel=info --pool=solo
+    depends_on:
+      - web
+      - redis
+    env_file:
+      - .env  

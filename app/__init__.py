@@ -14,8 +14,8 @@ def create_app():
     CORS(app)
     # Configure Celery using environment variables
     app.secret_key = os.getenv("APP_SECRET_KEY")
-    app.config['CELERY_BROKER_URL'] = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')
-    app.config['CELERY_RESULT_BACKEND'] = os.getenv('CELERY_RESULT_BACKEND', 'redis://localhost:6379/0')
+    app.config['CELERY_BROKER_URL'] = os.getenv('CELERY_BROKER_URL', 'redis://redis:6379/0')
+    app.config['CELERY_RESULT_BACKEND'] = os.getenv('CELERY_RESULT_BACKEND', 'redis://redis:6379/0')
 
     # Set the upload folder for file uploads
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

@@ -3,6 +3,7 @@ myenv/
 
 #ignore environment files
 **/.env*
+.env
 
 
 # Ignore compiled Python files
